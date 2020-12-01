@@ -31,9 +31,8 @@ swScalar (unsigned char   *querySeq,
           int              dbLength,
           unsigned short   gapOpen,
           unsigned short   gapExtend,
-          int             *pMatrix,
-          int             *pH,
-          int             *pE);
+          int             *pMatrix
+          );
 
 void *
 swScalarInit(unsigned char   *querySeq,
@@ -106,9 +105,7 @@ void swScalarScan (unsigned char   *querySeq,
         score = swScalar (querySeq, queryLength, 
                           dbSeq, dbLen, 
                           gapInit, gapExt, 
-                          scalarData->pMatrix,
-                          scalarData->pH,
-                          scalarData->pE);
+                          scalarData->pMatrix);
 
         if (score >= threshold) {
             int minScore = insertList (scores, score, seqName (dbLib));
@@ -137,9 +134,8 @@ swScalar(unsigned char   *querySeq,
          int              dbLength,
          unsigned short   gapOpen,
          unsigned short   gapExtend,
-         int             *pMatrix,
-         int             *pH,
-         int             *pE)
+         int             *pMatrix
+        )
 {
     int     i, j;
 
@@ -149,6 +145,9 @@ swScalar(unsigned char   *querySeq,
     int maxScore = 0;
 
     int *pScore;
+
+    int pH[queryLength];
+    int pE[queryLength];
 
     /* Zero out the storage vector */
     for (i = 0; i < queryLength; i++)

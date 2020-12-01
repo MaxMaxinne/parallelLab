@@ -278,9 +278,10 @@ int main (int argc, char **argv)
      ftime(&startTime);
 
     swData = (swFuncs[swType].init) (querySeq, queryLen, matrix);
-
-    (swFuncs[swType].scan) (querySeq, queryLen, dbLib, swData, &options, list);
-
+    // #pragma omp parallel
+    {
+        (swFuncs[swType].scan) (querySeq, queryLen, dbLib, swData, &options, list);
+    }
     (swFuncs[swType].done) (swData);
 
      ftime(&endTime);
@@ -366,7 +367,7 @@ int insertList (SCORE_LIST *list, int score, char *name)
     SCORE_NODE *node;
     SCORE_NODE *ptr = list->first;
 
-    if (list->free != NULL) {
+    if (list->free != NULL) {//维持链表有序，大小小于最大长度，如果超出删除最后一个元素（最小）
         node = list->free;
         list->free = list->free->next;
     } else if (score > list->last->score) {

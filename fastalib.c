@@ -151,7 +151,7 @@ nextSeq (FASTA_LIB *lib, int *length)
     len = 0;
     done = 0;
     do {
-        if (inx >= lib->size) {
+        if (inx >= lib->size) {//处理超出了buffer的情况
             size = readNextBlock (lib);
             if (size == 0) {
                 *seq = '\0';
@@ -160,7 +160,7 @@ nextSeq (FASTA_LIB *lib, int *length)
             inx = 0;
         } else if (isspace(lib->readBuffer[inx])) {
             ++inx;
-        } else if (lib->readBuffer[inx] == '>') {
+        } else if (lib->readBuffer[inx] == '>') {//读到了下一条记录的开始，以>标记
             *seq = '\0';
             done = 1;
         } else if (len >= MAX_SEQ_LENGTH) {

@@ -212,10 +212,11 @@ void swStripedScan (unsigned char   *querySeq,
     int gapInit = -(options->gapInit + options->gapExt);
     int gapExt  = -options->gapExt;
 
-    SwStripedData *stripedData = (SwStripedData *) swData;
-
-    dbSeq = nextSeq (dbLib, &dbLen);
     int count=0;
+
+    SwStripedData *stripedData = (SwStripedData *) swData;
+    // #pragma omp critical
+        dbSeq = nextSeq (dbLib, &dbLen);
     while (dbLen > 0) {
 
         score = swStripedByte (querySeq, queryLength, 
@@ -244,14 +245,14 @@ void swStripedScan (unsigned char   *querySeq,
                 threshold = minScore;
             }
         }
-
-        dbSeq = nextSeq (dbLib, &dbLen);
-        count++;
+        
+            dbSeq = nextSeq (dbLib, &dbLen);
+        //count++;
+        // printf("%d\n",score);
     }
 
     ftime(&end_t);
     TPRINT(start_t,end_t,"Scan");
-    printf("%d\n",count);
 }
 
 void
@@ -499,7 +500,7 @@ swStripedByte(unsigned char   *querySeq,
     vGapExtend = _mm_shufflelo_epi16 (vGapExtend, 0);
     vGapExtend = _mm_shuffle_epi32 (vGapExtend, 0);
 
-    vMaxScore = _mm_xor_si128 (vMaxScore, vMaxScore);
+    vMaxScore = _mm_xor_si128 (vMaxScore, vMaxScore);//置0
 
     vZero = _mm_xor_si128 (vZero, vZero);
 

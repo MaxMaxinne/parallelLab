@@ -66,7 +66,7 @@ signed char *readMatrix (char *file)
     done = 0;
     while (!done && fgets (line, BUF_SIZE, fp) != NULL) {
         char *ptr = skipSpaces (line);
-        if (*ptr && *ptr != '#') {
+        if (*ptr && *ptr != '#') {//跳过注释
 
             while (*ptr && *ptr != '#') {
                 int inx = AMINO_ACID_VALUE[*ptr];

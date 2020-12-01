@@ -3,7 +3,7 @@ TARGET=swsse2
 CC=icc
 INCLUDE=./include
 
-FLAGS=-O3 -g
+FLAGS= -g -O3
 SOURCES = swsse2.c swscalar.c swstriped.c swwozniak.c fastalib.c matrix.c
 OBJECTS = $(SOURCES:.c=.o)
 
