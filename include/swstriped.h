@@ -28,6 +28,7 @@ swStripedInit (unsigned char   *querySeq,
 void 
 swStripedScan (unsigned char   *querySeq,
                int              queryLength,
+               LIB_LOCAL       *lib_local,
                FASTA_LIB       *dbLib,
                void            *swData,
                SEARCH_OPTIONS  *options,

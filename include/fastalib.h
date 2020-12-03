@@ -35,11 +35,16 @@ typedef struct {
     int pad;
 } FASTA_LIB;
 
+typedef struct{
+  char* seqName;
+  unsigned char* seqBuffer;
+} LIB_LOCAL;
+
 FASTA_LIB *openLib (char *file, int pad);
 void closeLib (FASTA_LIB *lib);
 
-unsigned char *nextSeq (FASTA_LIB *lib, int *length);
-
+unsigned char *nextSeq (LIB_LOCAL*,FASTA_LIB *lib, int *length);
+unsigned char *nextQuerySeq (FASTA_LIB *lib, int *length);
 #define seqName(LIB) (LIB->seqName)
 
 #endif /* INCLUDE_FASTALIB_H */

@@ -62,10 +62,10 @@ swStripedInit(unsigned char   *querySeq,
               int              queryLength,
               signed char     *matrix)
 {
-    struct timeb start_t;
-    struct timeb end_t;
+    // struct timeb start_t;
+    // struct timeb end_t;
 
-    ftime(&start_t);
+    // ftime(&start_t);
     int i, j, k;
 
     int segSize;
@@ -185,22 +185,23 @@ swStripedInit(unsigned char   *querySeq,
 
     pSwData->bias = (unsigned short) -bias;
 
-    ftime(&end_t);
-    TPRINT(start_t,end_t,"Init");
+    // ftime(&end_t);
+    // TPRINT(start_t,end_t,"Init");
 
     return pSwData;
 }
 
 void swStripedScan (unsigned char   *querySeq,
                     int              queryLength,
+                    LIB_LOCAL       *lib_local,
                     FASTA_LIB       *dbLib,
                     void            *swData,
                     SEARCH_OPTIONS  *options,
                     SCORE_LIST      *scores)
 {
-    struct timeb start_t,end_t;
+    // struct timeb start_t,end_t;
 
-    ftime(&start_t);
+    // ftime(&start_t);
 
     int score;
 
@@ -215,8 +216,8 @@ void swStripedScan (unsigned char   *querySeq,
     int count=0;
 
     SwStripedData *stripedData = (SwStripedData *) swData;
-    // #pragma omp critical
-        dbSeq = nextSeq (dbLib, &dbLen);
+     #pragma omp critical
+        dbSeq = nextSeq (lib_local,dbLib, &dbLen);
     while (dbLen > 0) {
 
         score = swStripedByte (querySeq, queryLength, 
@@ -238,21 +239,23 @@ void swStripedScan (unsigned char   *querySeq,
                                    stripedData->pvH2,
                                    stripedData->pvE);
         }
-
+        #pragma omp critical
+        {
         if (score >= threshold) {
-            int minScore = insertList (scores, score, seqName (dbLib));
+            int minScore = insertList (scores, score, seqName (lib_local));
             if (minScore >= threshold) {
                 threshold = minScore;
             }
         }
         
-            dbSeq = nextSeq (dbLib, &dbLen);
+            dbSeq = nextSeq (lib_local,dbLib, &dbLen);
+        }
         //count++;
         // printf("%d\n",score);
     }
 
-    ftime(&end_t);
-    TPRINT(start_t,end_t,"Scan");
+    // ftime(&end_t);
+    // TPRINT(start_t,end_t,"Scan");
 }
 
 void
@@ -283,6 +286,7 @@ swStripedWord(unsigned char   *querySeq,
     int     iter = (queryLength + 7) / 8;
     
     __m128i *pv;
+
 
     __m128i vE, vF, vH;
 

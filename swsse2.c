@@ -21,9 +21,10 @@
 #include "swsse2.h"
 #include "matrix.h"
 #include "fastalib.h"
-
+#ifdef OTHER
 #include "swscalar.h"
 #include "swwozniak.h"
+#endif
 #ifdef WITH_ROGNES
 #include "swrognes.h"
 #endif
@@ -44,7 +45,8 @@ const char *SW_IMPLEMENATION[] = {
 #ifdef WITH_ROGNES
     "Rognes",
 #endif
-    "Striped",
+"Striped"
+    
 };
 
 typedef struct {
@@ -53,6 +55,7 @@ typedef struct {
                       signed char     *matrix);
     void     (*scan) (unsigned char   *querySeq,
                       int              queryLength,
+                      LIB_LOCAL       *lib_local,
                       FASTA_LIB       *dbLib,
                       void            *swData,
                       SEARCH_OPTIONS  *options,
@@ -61,16 +64,16 @@ typedef struct {
 } SW_FUNCT_DEFS;
 
 SW_FUNCT_DEFS swFuncs[] = {
-    {
-        swScalarInit,
-        swScalarScan,
-        swScalarComplete,
-    },
-    {
-        swWozniakInit,
-        swWozniakScan,
-        swWozniakComplete,
-    },
+    // {
+    //     swScalarInit,
+    //     swScalarScan,
+    //     swScalarComplete,
+    // },
+    // {
+    //     swWozniakInit,
+    //     swWozniakScan,
+    //     swWozniakComplete,
+    // },
 #ifdef WITH_ROGNES
     {
         swRognesInit,
@@ -161,7 +164,7 @@ int main (int argc, char **argv)
     FASTA_LIB *queryLib;
     FASTA_LIB *dbLib;
 
-    void *swData;
+    // void *swData;
 
      struct timeb startTime;
      struct timeb endTime;
@@ -265,7 +268,7 @@ int main (int argc, char **argv)
     dbLib = openLib (dbFile, swType == WOZNIAK);
     queryLib = openLib (queryFile, 0);
 
-    querySeq = nextSeq (queryLib, &queryLen);
+    querySeq = nextQuerySeq (queryLib, &queryLen);
     if (queryLen == 0) {
         fprintf (stderr, "Empty query sequence\n");
         exit (-1);
@@ -277,12 +280,23 @@ int main (int argc, char **argv)
 
      ftime(&startTime);
 
-    swData = (swFuncs[swType].init) (querySeq, queryLen, matrix);
-    // #pragma omp parallel
-    {
-        (swFuncs[swType].scan) (querySeq, queryLen, dbLib, swData, &options, list);
+    
+     #pragma omp parallel
+    {   
+        void *swData = (swFuncs[0].init) (querySeq, queryLen, matrix);
+        //开辟local序列存储
+        LIB_LOCAL* lib_local=(LIB_LOCAL*) malloc(sizeof(LIB_LOCAL));
+        lib_local->seqBuffer=(unsigned char*)malloc(MAX_SEQ_LENGTH);
+        lib_local->seqName=(char*)malloc(128);
+
+        (swFuncs[0].scan) (querySeq, queryLen, lib_local,dbLib, swData, &options, list);
+
+        free(lib_local->seqName);
+        free(lib_local->seqBuffer);
+        free(lib_local);
+        (swFuncs[0].done) (swData);
     }
-    (swFuncs[swType].done) (swData);
+    
 
      ftime(&endTime);
 
@@ -297,7 +311,7 @@ int main (int argc, char **argv)
      endTimeSec = endTime.time + endTime.millitm / 1000.0;
     printf ("Scan time: %6.3f (%s implementation)\n", 
             endTimeSec - startTimeSec,
-            SW_IMPLEMENATION[swType]);
+            SW_IMPLEMENATION[0]);
   
     closeLib (queryLib);
     closeLib (dbLib);

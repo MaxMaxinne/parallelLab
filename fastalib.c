@@ -91,9 +91,8 @@ readNextBlock (FASTA_LIB *lib)
 
     return lib->size;
 }
-
 unsigned char *
-nextSeq (FASTA_LIB *lib, int *length)
+nextQuerySeq (FASTA_LIB *lib, int *length)
 {
     int inx;
     int size;
@@ -198,13 +197,119 @@ nextSeq (FASTA_LIB *lib, int *length)
     return lib->seqBuffer;
 }
 
+unsigned char *
+nextSeq (LIB_LOCAL *lib_local,FASTA_LIB *lib, int *length)
+{
+    int inx;
+    int size;
+    int done;
+    int len;
+
+    char *name = lib_local->seqName;
+    unsigned char *seq = lib_local->seqBuffer;
+
+    /* check if we are at the end of the library */
+    if (lib->size == 0) {
+        *length = 0;
+        return NULL;
+    }
+
+    if (lib->pos == lib->size) {
+        readNextBlock (lib);
+    }
+
+    inx = lib->pos;
+
+    /* check for the start of a sequence */
+    if (lib->readBuffer[inx] != '>') {
+        fprintf (stderr, "Error parsing fasta file expecting > found %c\n",
+            lib->readBuffer[inx]);
+        exit (-1);
+    }
+
+    ++inx;
+
+    /* read in the sequence name */
+    len = 0;
+    done = 0;
+    do {
+        if (inx >= lib->size) {
+            size = readNextBlock (lib);
+            if (size == 0) {
+                *length = 0;
+                return NULL;
+            }
+            inx = lib->pos;
+        } else if (lib->readBuffer[inx] == '\n') {
+            *name = '\0';
+            done = 1;
+        } else if (len < SEQ_NAME_SIZE - 1) {
+            *name++ = lib->readBuffer[inx];
+            len++;
+        }
+        ++inx;
+    } while (!done);
+
+    lib->pos = inx;
+
+    /* read in the sequence */
+    len = 0;
+    done = 0;
+    do {
+        if (inx >= lib->size) {//处理超出了buffer的情况
+            size = readNextBlock (lib);
+            if (size == 0) {
+                *seq = '\0';
+                done = 1;
+            }
+            inx = 0;
+        } else if (isspace(lib->readBuffer[inx])) {
+            ++inx;
+        } else if (lib->readBuffer[inx] == '>') {//读到了下一条记录的开始，以>标记
+            *seq = '\0';
+            done = 1;
+        } else if (len >= MAX_SEQ_LENGTH) {
+            fprintf (stderr, "Sequence %s exceeds maximum length\n", 
+                lib_local->seqName);
+            exit (-1);
+        } else {
+            int value = AMINO_ACID_VALUE[lib->readBuffer[inx]];
+            if (value == -1) {
+                fprintf (stderr, "Unknown amino acid %c in sequence %s\n",
+                    lib->readBuffer[inx], lib_local->seqName);
+                exit (-1);
+            }
+            *seq++ = (char) value;
+            inx++;
+            len++;
+        }
+    } while (!done);
+
+    lib->pos = inx;
+    *length = len;
+
+    lib->sequences++;
+    lib->residues += len;
+
+    /*  check if we need to pad the sequence to a multiple of 16  */
+    if (lib->pad) {
+        inx = 16 - (len % 16);
+        while (inx--) {
+            *seq++ = ALPHA_SIZE;
+        }
+        *seq = '\0';
+    }
+
+    return lib_local->seqBuffer;
+}
+
 void closeLib (FASTA_LIB *lib)
 {
     fclose (lib->fp);
     
     free (lib->readBuffer);
-    free (lib->seqBuffer);
-    free (lib->seqName);
+    // free (lib->seqBuffer);
+    // free (lib->seqName);
 
     free (lib);
 }
