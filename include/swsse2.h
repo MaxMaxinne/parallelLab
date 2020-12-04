@@ -26,11 +26,9 @@ extern const int AMINO_ACID_VALUE[256];
 #define SHORT_BIAS 32768
 
 #define TPRINT(start_t,end_t,str)\
-    double startTimeSec = start_t.time + start_t.millitm / 1000.0;\
-    double endTimeSec = end_t.time + end_t.millitm / 1000.0;\
     printf ("%sTime: %6.3f \n", \
 	        str,\
-            endTimeSec - startTimeSec);\
+            (end_t.time + end_t.millitm / 1000.0) - (start_t.time + start_t.millitm / 1000.0));\
 
 typedef struct {
     short gapInit;

@@ -159,7 +159,7 @@ int main (int argc, char **argv)
     unsigned char *querySeq;
     int queryLen;
 
-    SCORE_LIST *list;
+    SCORE_LIST* list;    
 
     FASTA_LIB *queryLib;
     FASTA_LIB *dbLib;
@@ -257,8 +257,10 @@ int main (int argc, char **argv)
         ++i;
     }
 
-    list = initList (rptCount);
+    // double startTimeSec;
+    // double endTimeSec;
 
+    list=initList(rptCount);
     matrix = readMatrix (matrixFile);
     if (matrix == NULL) {
         fprintf (stderr, "Error reading matrix\n");
@@ -279,27 +281,61 @@ int main (int argc, char **argv)
             matrixFile, options.gapInit, options.gapExt);
 
      ftime(&startTime);
-
-    
+    //  unsigned char *dbSeq;
+    // int dbLen;
+    // dbLen = readNextBlock (dbLib);
+    //  while(dbLen)
+    //     dbLen = readNextBlock (dbLib);
+    int thread_num=8;
+    #pragma omp parallel
+    {
+        thread_num=omp_get_num_threads();
+    }
+    SCORE_NODE* list_arr[thread_num];
      #pragma omp parallel
     {   
+        int tid=omp_get_thread_num();
         void *swData = (swFuncs[0].init) (querySeq, queryLen, matrix);
         //开辟local序列存储
         LIB_LOCAL* lib_local=(LIB_LOCAL*) malloc(sizeof(LIB_LOCAL));
         lib_local->seqBuffer=(unsigned char*)malloc(MAX_SEQ_LENGTH);
         lib_local->seqName=(char*)malloc(128);
-
-        (swFuncs[0].scan) (querySeq, queryLen, lib_local,dbLib, swData, &options, list);
-
+        SCORE_LIST *list_local;
+        list_local = initList (100);//为每个线程初始化100个list
+        
+        (swFuncs[0].scan) (querySeq, queryLen, lib_local,dbLib, swData, &options, list_local);
+        list_arr[tid]=list_local->first;
         free(lib_local->seqName);
         free(lib_local->seqBuffer);
         free(lib_local);
         (swFuncs[0].done) (swData);
     }
-    
+    struct timeb list_merge_start;
+    ftime(&list_merge_start);
+    SCORE_NODE* res_ptr=list->free;
+    while(res_ptr){
+        int maxScore=0;
+        int max_ptr=-1;
+        for(int i=0;i<thread_num;i++){
+            if(list_arr[i]&&list_arr[i]->score>maxScore){
+                maxScore=list_arr[i]->score;
+                max_ptr=i;
+            }
+        }
+        if(max_ptr==-1)
+            break;
+        strncpy(res_ptr->name,list_arr[max_ptr]->name,MAX_SCORE_NAME);
+        res_ptr->score=list_arr[max_ptr]->score;
+        if(list->first==NULL){
+            list->first=res_ptr;
+            continue;
+        }
+        res_ptr=res_ptr->next;
+        list_arr[max_ptr]=list_arr[max_ptr]->next;
+    }
 
      ftime(&endTime);
-
+     TPRINT(list_merge_start,endTime,"list merge:");
     printResults (list);
 
     printf ("\n");
@@ -311,7 +347,7 @@ int main (int argc, char **argv)
      endTimeSec = endTime.time + endTime.millitm / 1000.0;
     printf ("Scan time: %6.3f (%s implementation)\n", 
             endTimeSec - startTimeSec,
-            SW_IMPLEMENATION[0]);
+            SW_IMPLEMENATION[2]);
   
     closeLib (queryLib);
     closeLib (dbLib);
@@ -390,7 +426,7 @@ int insertList (SCORE_LIST *list, int score, char *name)
         list->last->next = NULL;
     } else {
         /* should never happen */
-        return list->minScore + 1;
+        return list->minScore;
     }
 
     strncpy (node->name, name, MAX_SCORE_NAME);
@@ -436,7 +472,7 @@ void printResults (SCORE_LIST *list)
 
     //printf ("Score  Description\n");
     FILE* f=fopen("./data/res","w");
-    fprintf(f,"Score Description\n");
+    fprintf(f,"Score  Description\n");
 
     while (ptr) {
         fprintf (f,"%5d  %s\n", ptr->score, ptr->name);

@@ -18,7 +18,7 @@
 #include "swsse2.h"
 #include "fastalib.h"
 
-#define READ_BUFFER_SIZE (128 * 1024)
+#define READ_BUFFER_SIZE (1024 * 1024)
 #define SEQ_NAME_SIZE    (128)
 
 FASTA_LIB *openLib (char *file, int pad)

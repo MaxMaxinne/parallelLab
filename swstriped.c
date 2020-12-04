@@ -199,9 +199,9 @@ void swStripedScan (unsigned char   *querySeq,
                     SEARCH_OPTIONS  *options,
                     SCORE_LIST      *scores)
 {
-    // struct timeb start_t,end_t;
+    struct timeb start_t,end_t;
 
-    // ftime(&start_t);
+    ftime(&start_t);
 
     int score;
 
@@ -239,7 +239,7 @@ void swStripedScan (unsigned char   *querySeq,
                                    stripedData->pvH2,
                                    stripedData->pvE);
         }
-        #pragma omp critical
+        
         {
         if (score >= threshold) {
             int minScore = insertList (scores, score, seqName (lib_local));
@@ -247,15 +247,15 @@ void swStripedScan (unsigned char   *querySeq,
                 threshold = minScore;
             }
         }
-        
+        #pragma omp critical
             dbSeq = nextSeq (lib_local,dbLib, &dbLen);
         }
         //count++;
         // printf("%d\n",score);
     }
 
-    // ftime(&end_t);
-    // TPRINT(start_t,end_t,"Scan");
+    ftime(&end_t);
+    TPRINT(start_t,end_t,"Scan");
 }
 
 void
