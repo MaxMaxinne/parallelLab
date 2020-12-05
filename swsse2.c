@@ -311,7 +311,8 @@ int main (int argc, char **argv)
         lib_local->seqName=(char*)malloc(128);
         //开辟local链表空间
         SCORE_LIST *list_local;
-        list_local = initList (100);//为每个线程初始化100个list
+
+        list_local = initList (rptCount/thread_num*2);//为每个线程初始化100个list
         
         (swFuncs[0].scan) (querySeq, queryLen, lib_local,dbLib[tid], swData, &options, list_local);
         list_arr[tid]=list_local->first;
