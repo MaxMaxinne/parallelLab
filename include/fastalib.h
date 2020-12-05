@@ -18,10 +18,36 @@
 
 #define MAX_SEQ_LENGTH (64 * 1024)
 
+typedef struct BUFFER_STRUCT{
+  int size;
+  struct BUFFER_STRUCT* next;
+  char* buffer_ptr;
+}BUFFER_NODE;
+
 typedef struct {
     char *readBuffer;
 
-    char *seqName;
+    // char *seqName;
+    // unsigned char *seqBuffer;
+
+    int pos;
+    int size;
+
+    FILE *fp;
+
+    int sequences;
+    int residues;
+
+    BUFFER_NODE* belong;
+
+    int pad;
+    int tid;
+} FASTA_LIB;
+
+typedef struct{
+  char* readBuffer;
+
+  char *seqName;
     unsigned char *seqBuffer;
 
     int pos;
@@ -32,19 +58,32 @@ typedef struct {
     int sequences;
     int residues;
 
+    
+
     int pad;
-} FASTA_LIB;
+    
+}QUERY_LIB;
 
 typedef struct{
   char* seqName;
   unsigned char* seqBuffer;
 } LIB_LOCAL;
 
-FASTA_LIB *openLib (char *file, int pad);
-void closeLib (FASTA_LIB *lib);
 
+
+typedef struct{
+  char* start;
+  int size;
+  BUFFER_NODE* belong;//指向所属的buffer
+}BUFFER_LOCAL;
+
+FASTA_LIB **openLib (char *file, int pad);
+void closeLib (FASTA_LIB **lib);
 unsigned char *nextSeq (LIB_LOCAL*,FASTA_LIB *lib, int *length);
-unsigned char *nextQuerySeq (FASTA_LIB *lib, int *length);
+
+unsigned char *nextQuerySeq (QUERY_LIB *lib, int *length);
+QUERY_LIB *openQueryLib (char *file, int pad);
+void closeQueryLib (QUERY_LIB *lib);
 #define seqName(LIB) (LIB->seqName)
 
 #endif /* INCLUDE_FASTALIB_H */

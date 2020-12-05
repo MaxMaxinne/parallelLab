@@ -140,6 +140,8 @@ void printUsage (void)
     printf ("    db       : sequence database file (fasta format)\n");
 }
 
+int thread_num=8;
+
 int main (int argc, char **argv)
 {
     int i;
@@ -161,8 +163,8 @@ int main (int argc, char **argv)
 
     SCORE_LIST* list;    
 
-    FASTA_LIB *queryLib;
-    FASTA_LIB *dbLib;
+    QUERY_LIB *queryLib;
+    FASTA_LIB **dbLib;
 
     // void *swData;
 
@@ -171,6 +173,8 @@ int main (int argc, char **argv)
 
     double startTimeSec;
     double endTimeSec;
+
+    
 
     SEARCH_OPTIONS options;
 
@@ -186,18 +190,20 @@ int main (int argc, char **argv)
 
     i = 1;
     while (i < argc) {
-        if (i + 3 == argc) {
+        if (i + 4 == argc) {
             /* should be matrix file name */
             matrixFile = argv[i];
 
-        } else if (i + 2 == argc) {
+        } else if (i + 3 == argc) {
             /* should be query file name */
             queryFile = argv[i];
 
-        } else if (i + 1 == argc) {
+        } else if (i + 2 == argc) {
             /* should be matrix file name */
             dbFile = argv[i];
 
+        } else if(i+1==argc){
+            thread_num=atoi(argv[4]);
         } else {
             /* process arguements */
             switch (argv[i][1]) {
@@ -268,7 +274,7 @@ int main (int argc, char **argv)
     }
 
     dbLib = openLib (dbFile, swType == WOZNIAK);
-    queryLib = openLib (queryFile, 0);
+    queryLib = openQueryLib (queryFile, 0);
 
     querySeq = nextQuerySeq (queryLib, &queryLen);
     if (queryLen == 0) {
@@ -286,30 +292,45 @@ int main (int argc, char **argv)
     // dbLen = readNextBlock (dbLib);
     //  while(dbLen)
     //     dbLen = readNextBlock (dbLib);
-    int thread_num=8;
-    #pragma omp parallel
-    {
-        thread_num=omp_get_num_threads();
-    }
+    
+    // #pragma omp parallel 
+    // {
+    //     thread_num=omp_get_num_threads();
+    // }
     SCORE_NODE* list_arr[thread_num];
-     #pragma omp parallel
+    int sequences_db=0;
+    int residues_db=0;
+     #pragma omp parallel num_threads(thread_num)
     {   
         int tid=omp_get_thread_num();
+        
         void *swData = (swFuncs[0].init) (querySeq, queryLen, matrix);
-        //开辟local序列存储
+        //开辟local seq存储空间
         LIB_LOCAL* lib_local=(LIB_LOCAL*) malloc(sizeof(LIB_LOCAL));
         lib_local->seqBuffer=(unsigned char*)malloc(MAX_SEQ_LENGTH);
         lib_local->seqName=(char*)malloc(128);
+        //开辟local链表空间
         SCORE_LIST *list_local;
         list_local = initList (100);//为每个线程初始化100个list
         
-        (swFuncs[0].scan) (querySeq, queryLen, lib_local,dbLib, swData, &options, list_local);
+        (swFuncs[0].scan) (querySeq, queryLen, lib_local,dbLib[tid], swData, &options, list_local);
         list_arr[tid]=list_local->first;
+        //free
         free(lib_local->seqName);
         free(lib_local->seqBuffer);
         free(lib_local);
         (swFuncs[0].done) (swData);
+
+        
     }
+    
+    //计算R基数目和seq数目
+    for(int i=0;i<thread_num;i++){
+            residues_db+=dbLib[i]->residues;
+            sequences_db+=dbLib[i]->sequences;
+        }
+
+    //合并list
     struct timeb list_merge_start;
     ftime(&list_merge_start);
     SCORE_NODE* res_ptr=list->free;
@@ -338,10 +359,11 @@ int main (int argc, char **argv)
      TPRINT(list_merge_start,endTime,"list merge:");
     printResults (list);
 
+
     printf ("\n");
     printf ("%d residues in query string\n", queryLen);
     printf ("%d residues in %d library sequences\n", 
-            dbLib->residues, dbLib->sequences);
+            residues_db, sequences_db);
 
      startTimeSec = startTime.time + startTime.millitm / 1000.0;
      endTimeSec = endTime.time + endTime.millitm / 1000.0;
@@ -349,7 +371,7 @@ int main (int argc, char **argv)
             endTimeSec - startTimeSec,
             SW_IMPLEMENATION[2]);
   
-    closeLib (queryLib);
+    closeQueryLib (queryLib);
     closeLib (dbLib);
 
     free (matrix);
