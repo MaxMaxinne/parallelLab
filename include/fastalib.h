@@ -22,6 +22,7 @@ typedef struct BUFFER_STRUCT{
   int size;
   struct BUFFER_STRUCT* next;
   char* buffer_ptr;
+  int direction;
 }BUFFER_NODE;
 
 typedef struct {

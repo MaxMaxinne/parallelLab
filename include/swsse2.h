@@ -25,8 +25,9 @@ extern const int AMINO_ACID_VALUE[256];
 
 #define SHORT_BIAS 32768
 
-#define TPRINT(start_t,end_t,str)\
-    printf ("%sTime: %6.3f \n", \
+#define TPRINT(tid,start_t,end_t,str)\
+    printf ("%d:%sTime: %6.3f \n", \
+          tid,\
 	        str,\
             (end_t.time + end_t.millitm / 1000.0) - (start_t.time + start_t.millitm / 1000.0));\
 

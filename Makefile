@@ -3,7 +3,7 @@ TARGET=swsse2
 CC=icc
 INCLUDE=./include
 
-FLAGS= -g -O0 -fopenmp -par-affinity=scatter
+FLAGS= -g -O3 -fopenmp -par-affinity=scatter -gdwarf-2
 SOURCES = swsse2.c swstriped.c fastalib.c matrix.c
 OBJECTS = $(SOURCES:.c=.o)
 

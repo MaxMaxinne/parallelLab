@@ -18,7 +18,7 @@
 #include "swsse2.h"
 #include "fastalib.h"
 
-#define READ_BUFFER_SIZE (1024 * 1024*100)
+#define READ_BUFFER_SIZE (1024 * 1024*30)
 #define SEQ_NAME_SIZE    (128)
 
 
@@ -55,6 +55,7 @@ FASTA_LIB **openLib (char *file, int pad)
     buffer_list->buffer_ptr=globalBuffer;
     buffer_list->size=totalSize;
     buffer_list->next=NULL;
+    buffer_list->direction=1;
     // lib = (FASTA_LIB *) malloc (sizeof (FASTA_LIB));
     // if (!lib) {
     //     fprintf (stderr, "Unable to allocate memory for library header\n");
@@ -65,12 +66,14 @@ FASTA_LIB **openLib (char *file, int pad)
     int chunkSize=totalSize/thread_num;
     for(int i=0;i<thread_num;i++){
         buffer_local[i]=malloc(sizeof(FASTA_LIB));
-        buffer_local[i]->readBuffer=globalBuffer;
-        buffer_local[i]->pos=i*chunkSize;
+        buffer_local[i]->readBuffer=globalBuffer+i*chunkSize;
+        buffer_local[i]->pos=0;
         buffer_local[i]->size=chunkSize;
         buffer_local[i]->fp=fp;
         buffer_local[i]->tid=i;
         buffer_local[i]->belong=buffer_list;
+        buffer_local[i]->residues=0;
+        buffer_local[i]->sequences=0;
     }
 
     // lib->seqBuffer = (unsigned char *) malloc (MAX_SEQ_LENGTH);
@@ -174,13 +177,13 @@ static int
 readNextBlock (FASTA_LIB *lib)
 {
     FILE *fp = lib->fp;
-    size_t size=0;
-    int self_flag=0;
+    
+    static int direction=0;
     #pragma omp critical
     {
         if(lib->belong->next==NULL&&!feof(fp)){
             int totalSize=0;
-            char* globalBuffer=NULL;
+            char* globalBuffer=malloc(READ_BUFFER_SIZE);
             totalSize = fread (globalBuffer, sizeof (char), READ_BUFFER_SIZE, fp);
             if (lib->size == 0 && !feof (fp)) {
                 fprintf (stderr, "Error (%d) reading fasta file\n", ferror (fp));
@@ -189,30 +192,38 @@ readNextBlock (FASTA_LIB *lib)
             BUFFER_NODE * new_node=malloc(sizeof(BUFFER_NODE));
             new_node->buffer_ptr=globalBuffer;
             new_node->size=totalSize;
+            new_node->direction=direction;
+            direction=!direction;
             new_node->next=NULL;
-            if(size>=READ_BUFFER_SIZE){
-                lib->belong->next=new_node;
+            // if(totalSize>=READ_BUFFER_SIZE){
+            //     lib->belong->next=new_node;
 
-            }else{
-                last_buffer=new_node;
-                lib->belong=new_node;
-                lib->pos=0;
-                lib->size=totalSize;
-                lib->readBuffer=globalBuffer;
-                self_flag=1;
-            }
+            // }else{
+            //     last_buffer=new_node;
+            //     lib->belong=new_node;
+            //     lib->pos=0;
+            //     lib->size=totalSize;
+            //     lib->readBuffer=globalBuffer;
+            //     self_flag=1;
+            // }
+            lib->belong->next=new_node;
         }
     }
-    if(self_flag)
-        return lib->size;
     if(lib->belong->next==NULL){
+        lib->size=0;
         return 0;
     }
     lib->belong=lib->belong->next;
-    lib->readBuffer=lib->belong->buffer_ptr;
     int chunkSize=lib->belong->size/thread_num;
-    lib->pos=lib->tid*chunkSize;
-    lib->size=chunkSize;
+    if(lib->belong->direction)
+        lib->readBuffer=lib->belong->buffer_ptr+lib->tid*chunkSize;
+    else
+        lib->readBuffer=lib->belong->buffer_ptr+(thread_num-1-lib->tid)*chunkSize;
+    lib->pos=0;
+    if((direction&&lib->tid==thread_num-1)||(!direction&&lib->tid==0))
+        lib->size=lib->belong->size-(thread_num-1)*chunkSize;
+    else
+        lib->size=chunkSize;
     //不用处理最后一个线程的空间大小问题
     
     
@@ -383,7 +394,7 @@ nextSeq (LIB_LOCAL *lib_local,FASTA_LIB *lib, int *length)
     do {
         if (inx >= lib->size) {
             //分配得到的是最后一块
-            if(lib->tid==thread_num-1){
+            if((lib->tid==thread_num-1&&lib->belong->direction)||(lib->tid==0&&!lib->belong->direction)){
                 size = readNextBlock (lib);
                 if (size == 0) {
                     *length = 0;
@@ -392,8 +403,10 @@ nextSeq (LIB_LOCAL *lib_local,FASTA_LIB *lib, int *length)
                 inx = lib->pos;
             }else{
                 while(lib->readBuffer[inx] != '\n'){
-                    if(len>=SEQ_NAME_SIZE - 1)
-                        break;
+                    if(len>=SEQ_NAME_SIZE - 1){
+                        inx++;
+                        continue;
+                    }
                     *name++ = lib->readBuffer[inx++];
                     len++;
                 }
@@ -418,7 +431,7 @@ nextSeq (LIB_LOCAL *lib_local,FASTA_LIB *lib, int *length)
     do {
         if (inx >= lib->size) {
             //处理超出了buffer的情况
-            if(lib->tid==thread_num-1){
+            if((lib->tid==thread_num-1&&lib->belong->direction)||(lib->tid==0&&!lib->belong->direction)){
                 size = readNextBlock (lib);
                 if (size == 0) {
                     *seq = '\0';
@@ -426,7 +439,7 @@ nextSeq (LIB_LOCAL *lib_local,FASTA_LIB *lib, int *length)
                 }
                 inx = 0;
             }else{
-                while(lib->readBuffer[inx] != '>'){
+                while(lib->readBuffer[inx] != '>'&&lib->readBuffer[inx] != '\0'){
                     if(isspace(lib->readBuffer[inx])){
                         inx++;
                         continue;
@@ -468,6 +481,10 @@ nextSeq (LIB_LOCAL *lib_local,FASTA_LIB *lib, int *length)
 
 
     //处理超出读取的范围的问题
+    if(inx>=lib->size){
+        int size_next=readNextBlock(lib);
+        inx=0;
+    }
     lib->pos = inx;
     *length = len;
 

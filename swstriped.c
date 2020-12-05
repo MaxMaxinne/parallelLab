@@ -217,7 +217,7 @@ void swStripedScan (unsigned char   *querySeq,
 
     SwStripedData *stripedData = (SwStripedData *) swData;
     //  #pragma omp critical
-        dbSeq = nextSeq (lib_local,dbLib, &dbLen);
+    dbSeq = nextSeq (lib_local,dbLib, &dbLen);
     while (dbLen > 0) {
 
         score = swStripedByte (querySeq, queryLength, 
@@ -247,7 +247,6 @@ void swStripedScan (unsigned char   *querySeq,
                 threshold = minScore;
             }
         }
-        // #pragma omp critical
             dbSeq = nextSeq (lib_local,dbLib, &dbLen);
         }
         //count++;
@@ -255,7 +254,7 @@ void swStripedScan (unsigned char   *querySeq,
     }
 
     ftime(&end_t);
-    TPRINT(start_t,end_t,"Scan");
+    TPRINT(dbLib->tid,start_t,end_t,"Scan");
 }
 
 void

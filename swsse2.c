@@ -328,6 +328,7 @@ int main (int argc, char **argv)
     for(int i=0;i<thread_num;i++){
             residues_db+=dbLib[i]->residues;
             sequences_db+=dbLib[i]->sequences;
+            printf("%d:residues:%d,sequences:%d\n",i+1,dbLib[i]->residues,dbLib[i]->sequences);
         }
 
     //合并list
@@ -356,7 +357,7 @@ int main (int argc, char **argv)
     }
 
      ftime(&endTime);
-     TPRINT(list_merge_start,endTime,"list merge:");
+     TPRINT(0,list_merge_start,endTime,"list merge:");
     printResults (list);
 
 
