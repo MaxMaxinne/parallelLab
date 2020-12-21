@@ -18,7 +18,7 @@
 #include "swsse2.h"
 #include "fastalib.h"
 
-#define READ_BUFFER_SIZE (1024 * 1024*30)
+#define READ_BUFFER_SIZE (3000000000)
 #define SEQ_NAME_SIZE    (128)
 
 
@@ -383,9 +383,10 @@ nextSeq (LIB_LOCAL *lib_local,FASTA_LIB *lib, int *length)
     //         lib->readBuffer[inx]);
     //     exit (-1);
     // }
-    while(lib->readBuffer[inx] != '>')
+    while(lib->readBuffer[inx] != '>'&&inx<lib->belong->size)
         inx++;
-
+    if(inx>=lib->belong->size)
+        return NULL;
     ++inx;
 
     /* read in the sequence name */

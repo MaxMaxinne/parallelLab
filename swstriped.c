@@ -137,7 +137,7 @@ swStripedInit(unsigned char   *querySeq,
      */
 
     /* Find the bias to use in the substitution matrix */
-    bias = 127;
+    bias = 127;//偏置用于避免得分矩阵不必要的数值过大而导致溢出
     for (i = 0; i < ALPHA_SIZE * ALPHA_SIZE; i++) {
         if (matrix[i] < bias) {
             bias = matrix[i];
@@ -239,8 +239,13 @@ void swStripedScan (unsigned char   *querySeq,
                                    stripedData->pvH2,
                                    stripedData->pvE);
         }
-        
-        {
+        // score = swStripedWord (querySeq, queryLength, 
+        //                            dbSeq, dbLen, 
+        //                            gapInit, gapExt, 
+        //                            stripedData->pvsQueryProf,
+        //                            stripedData->pvH1,
+        //                            stripedData->pvH2,
+        //                            stripedData->pvE);
         if (score >= threshold) {
             int minScore = insertList (scores, score, seqName (lib_local));
             if (minScore >= threshold) {
@@ -248,7 +253,6 @@ void swStripedScan (unsigned char   *querySeq,
             }
         }
             dbSeq = nextSeq (lib_local,dbLib, &dbLen);
-        }
         //count++;
         // printf("%d\n",score);
     }
