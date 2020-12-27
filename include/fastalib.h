@@ -15,6 +15,8 @@
 #define INCLUDE_FASTALIB_H
 
 #include <stdio.h>
+#include <time.h>
+#include <sys/timeb.h>
 
 #define MAX_SEQ_LENGTH (64 * 1024)
 

@@ -134,7 +134,7 @@ QUERY_LIB *openQueryLib (char *file, int pad)
         exit (-1);
     }
 
-    lib->readBuffer = (char *) malloc (READ_BUFFER_SIZE);
+    lib->readBuffer = (char *) malloc (1024*10*3);
     if (!lib->readBuffer) {
         fprintf (stderr, "Unable to allocate memory for read buffer\n");
         exit (-1);
@@ -152,7 +152,7 @@ QUERY_LIB *openQueryLib (char *file, int pad)
         exit (-1);
     }
 
-    lib->size = (int) fread (lib->readBuffer, sizeof (char), READ_BUFFER_SIZE, fp);
+    lib->size = (int) fread (lib->readBuffer, sizeof (char), 1024*10*3, fp);
     if (lib->size == 0 && !feof (fp)) {
         fprintf (stderr, "Error (%d) reading fasta file\n", ferror (fp));
         exit (-1);
@@ -181,6 +181,10 @@ readNextBlock (FASTA_LIB *lib)
     static int direction=0;
     #pragma omp critical
     {
+        struct timeb s1,e1;
+        double startTimeSec=0;
+    double endTimeSec=0;
+        ftime(&s1);
         if(lib->belong->next==NULL&&!feof(fp)){
             int totalSize=0;
             char* globalBuffer=malloc(READ_BUFFER_SIZE);
@@ -206,8 +210,13 @@ readNextBlock (FASTA_LIB *lib)
             //     lib->readBuffer=globalBuffer;
             //     self_flag=1;
             // }
+            
             lib->belong->next=new_node;
         }
+        ftime(&e1);
+        TPRINT(lib->tid,s1,e1,"asd:");
+        if(lib->belong->next)
+            printf("%d",lib->belong->next->size);
     }
     if(lib->belong->next==NULL){
         lib->size=0;
@@ -236,7 +245,7 @@ readNextQueryBlock (QUERY_LIB *lib)
     FILE *fp = lib->fp;
     size_t size;
     
-    size = fread (lib->readBuffer, sizeof (char), READ_BUFFER_SIZE, fp);
+    size = fread (lib->readBuffer, sizeof (char), 1024*10*3,fp);
     if (lib->size == 0 && !feof (fp)) {
         fprintf (stderr, "Error (%d) reading fasta file\n", ferror (fp));
         exit (-1);
