@@ -22,11 +22,11 @@
 #include "swstriped.h"
 
 typedef struct {
-    __m128i        *pvbQueryProf;
-    __m128i        *pvsQueryProf;
-    __m128i        *pvH1;
-    __m128i        *pvH2;
-    __m128i        *pvE;
+    __m256i        *pvbQueryProf;
+    __m256i        *pvsQueryProf;
+    __m256i        *pvH1;
+    __m256i        *pvH2;
+    __m256i        *pvE;
     unsigned char  *pData;
     unsigned short  bias;
 } SwStripedData;
@@ -51,10 +51,10 @@ swStripedByte (unsigned char   *querySeq,
                int              dbLength,
                unsigned short   gapOpen,
                unsigned short   gapExtend,
-               __m128i         *queryProf,
-               __m128i         *pvH1,
-               __m128i         *pvH2,
-               __m128i         *pvE,
+               __m256i         *queryProf,
+               __m256i         *pvH1,
+               __m256i         *pvH2,
+               __m256i         *pvE,
                unsigned short   bias);
 
 void *
@@ -87,7 +87,7 @@ swStripedInit(unsigned char   *querySeq,
 
     SwStripedData *pSwData;
  
-    lenQryByte = (queryLength + 15) / 16;
+    lenQryByte = (queryLength + 31) / 32;
     lenQryShort = (queryLength + 7) / 8;
 
     pSwData = (SwStripedData *) malloc (sizeof (SwStripedData));
@@ -101,7 +101,7 @@ swStripedInit(unsigned char   *querySeq,
              lenQryShort * ALPHA_SIZE +       /* query profile short */
              (lenQryShort * 3);               /* vH1, vH2 and vE */
 
-    pSwData->pData = (unsigned char *) calloc (nCount, sizeof (__m128i));
+    pSwData->pData = (unsigned char *) calloc (nCount, sizeof (__m256i));
     if (!pSwData->pData) {
         fprintf (stderr, "Unable to allocate memory for SW data buffers\n");
         exit (-1);
@@ -111,7 +111,7 @@ swStripedInit(unsigned char   *querySeq,
     /* to 16 byte boundries ourselves */
     aligned = ((size_t) pSwData->pData + 15) & ~(0x0f);
 
-    pSwData->pvbQueryProf = (__m128i *) aligned;//?不会有问题嘛
+    pSwData->pvbQueryProf = (__m256i *) aligned;//?不会有问题嘛
     pSwData->pvsQueryProf = pSwData->pvbQueryProf + lenQryByte * ALPHA_SIZE;
 
     pSwData->pvH1 = pSwData->pvsQueryProf + lenQryShort * ALPHA_SIZE;
@@ -149,8 +149,8 @@ swStripedInit(unsigned char   *querySeq,
 
     /* Fill in the byte query profile */
     pc = (char *) pSwData->pvbQueryProf;
-    segSize = (queryLength + 15) / 16;
-    nCount = segSize * 16;
+    segSize = (queryLength + 31) / 32;
+    nCount = segSize * 32;
     for (i = 0; i < ALPHA_SIZE; ++i) {
         matrixRow = matrix + i * ALPHA_SIZE;
         for (j = 0; j < segSize; ++j) {
@@ -189,6 +189,7 @@ swStripedInit(unsigned char   *querySeq,
     // TPRINT(start_t,end_t,"Init");
 
     return pSwData;
+    
 }
 
 void swStripedScan (unsigned char   *querySeq,
@@ -219,7 +220,6 @@ void swStripedScan (unsigned char   *querySeq,
     //  #pragma omp critical
     dbSeq = nextSeq (lib_local,dbLib, &dbLen);
     while (dbLen > 0) {
-
         score = swStripedByte (querySeq, queryLength, 
                                dbSeq, dbLen, 
                                gapInit, gapExt, 
@@ -228,16 +228,23 @@ void swStripedScan (unsigned char   *querySeq,
                                stripedData->pvH2,
                                stripedData->pvE,
                                stripedData->bias);
+        // score = swStripedWord (querySeq, queryLength, 
+        //                            dbSeq, dbLen, 
+        //                            gapInit, gapExt, 
+        //                            stripedData->pvsQueryProf,
+        //                            stripedData->pvH1,
+        //                            stripedData->pvH2,
+        //                            stripedData->pvE);
 
         /* check if needs a run with higher precision */
         if (score >= 255) {
             score = swStripedWord (querySeq, queryLength, 
                                    dbSeq, dbLen, 
                                    gapInit, gapExt, 
-                                   stripedData->pvsQueryProf,
-                                   stripedData->pvH1,
-                                   stripedData->pvH2,
-                                   stripedData->pvE);
+                                   (__m128i*)stripedData->pvsQueryProf,
+                                   (__m128i*)stripedData->pvH1,
+                                   (__m128i*)stripedData->pvH2,
+                                   (__m128i*)stripedData->pvE);
         }
         // score = swStripedWord (querySeq, queryLength, 
         //                            dbSeq, dbLen, 
@@ -269,7 +276,6 @@ swStripedComplete(void *pSwData)
     free (pStripedData->pData);
     free (pStripedData);
 }
-
 int
 swStripedWord(unsigned char   *querySeq,
               int              queryLength,
@@ -447,6 +453,206 @@ swStripedWord(unsigned char   *querySeq,
     /* return largest score */
     return score + SHORT_BIAS;
 }
+// int
+// swStripedWord(unsigned char   *querySeq,
+//               int              queryLength,
+//               unsigned char   *dbSeq,
+//               int              dbLength,
+//               unsigned short   gapOpen,
+//               unsigned short   gapExtend,
+//               __m256i         *pvQueryProf,
+//               __m256i         *pvHLoad,
+//               __m256i         *pvHStore,
+//               __m256i         *pvE)
+// {
+//     int     i, j;
+//     int     score;
+
+//     int     cmp;
+//     int     iter = (queryLength + 15) / 16;
+    
+//     __m256i *pv;
+
+
+//     __m256i vE, vF, vH;
+
+//     __m256i vMaxScore;
+//     __m256i vGapOpen;
+//     __m256i vGapExtend;
+
+//     __m256i vMin;
+//     __m256i vMinimums;
+//     __m256i vTemp;
+
+//     __m256i *pvScore;
+
+//     /* remove unreferenced warning */
+//     querySeq;
+
+//     /* Load gap opening penalty to all elements of a constant */
+//     //broadcast gatopen
+//     // vGapOpen = _mm_insert_epi16 (vGapOpen, gapOpen, 0);
+//     // vGapOpen = _mm_shufflelo_epi16 (vGapOpen, 0);
+//     // vGapOpen = _mm_shuffle_epi32 (vGapOpen, 0);
+//     vGapOpen=_mm256_set1_epi16(gapOpen);
+//     /* Load gap extension penalty to all elements of a constant */
+//     // vGapExtend = _mm_insert_epi16 (vGapExtend, gapExtend, 0);
+//     // vGapExtend = _mm_shufflelo_epi16 (vGapExtend, 0);
+//     // vGapExtend = _mm_shuffle_epi32 (vGapExtend, 0);
+//     vGapExtend=_mm256_set1_epi16(gapExtend);
+//     /*  load vMaxScore with the zeros.  since we are using signed */
+//     /*  math, we will bias the maxscore to -32768 so we have the */
+//     /*  full range of the short. */
+//     vMaxScore = _mm256_cmpeq_epi16 (vMaxScore, vMaxScore);//填满0XFFFF
+//     // vMaxScore = _mm256_slli_epi16 (vMaxScore, 15);//设为-32768
+//     vMaxScore=_mm256_alignr_epi8(vMaxScore, _mm256_permute2x128_si256(vMaxScore, vMaxScore, _MM_SHUFFLE(0, 0, 2, 0)), 16 - 15);
+
+//     vMinimums = _mm256_shuffle_epi32 (vMaxScore, 0);//broadcast vMaxScore的低16位
+
+//     vMin = _mm256_shuffle_epi32 (vMaxScore, 0);//同上
+//     vMin=_mm256_alignr_epi8(vMin, _mm256_permute2x128_si256(vMin, vMin, _MM_SHUFFLE(0, 0, 2, 0)), 16 - 14);
+
+//     /* Zero out the storage vector */
+//     for (i = 0; i < iter; i++)
+//     {
+//         _mm256_storeu_si256 (pvE + i, vMaxScore);
+//         _mm256_storeu_si256 (pvHStore + i, vMaxScore);
+//     }
+
+//     for (i = 0; i < dbLength; ++i)
+//     {
+//         /* fetch first data asap. */
+//         pvScore = pvQueryProf + dbSeq[i] * iter;
+
+//         /* zero out F. */
+//         vF = _mm256_cmpeq_epi16 (vF, vF);
+//         // vF = _mm_slli_epi16 (vF, 15);
+//         vF=_mm256_alignr_epi8(vF, _mm256_permute2x128_si256(vF, vF, _MM_SHUFFLE(0, 0, 2, 0)), 16 - 15);
+
+//         /* load the next h value */
+//         vH = _mm256_loadu_si256 (pvHStore + iter - 1);
+//         // vH = _mm256_slli_si256 (vH, 2);
+//         vH=_mm256_alignr_epi8(vH, _mm256_permute2x128_si256(vH, vH, _MM_SHUFFLE(0, 0, 2, 0)), 16 - 2);        
+//         vH = _mm256_or_si256 (vH, vMin);
+
+//         pv = pvHLoad;
+//         pvHLoad = pvHStore;
+//         pvHStore = pv;
+
+//         for (j = 0; j < iter; j++)
+//         {
+//             /* load values of vF and vH from previous row (one unit up) */
+//             vE = _mm256_loadu_si256 (pvE + j);
+
+//             /* add score to vH */
+//             vH = _mm256_adds_epi16 (vH, *pvScore++);
+
+//             /* Update highest score encountered this far */
+//             vMaxScore = _mm256_max_epi16 (vMaxScore, vH);
+
+//             /* get max from vH, vE and vF */
+//             vH = _mm256_max_epi16 (vH, vE);
+//             vH = _mm256_max_epi16 (vH, vF);
+
+//             /* save vH values */
+//             _mm256_storeu_si256 (pvHStore + j, vH);
+
+//             /* update vE value */
+//             vH = _mm256_subs_epi16 (vH, vGapOpen);
+//             vE = _mm256_subs_epi16 (vE, vGapExtend);
+//             vE = _mm256_max_epi16 (vE, vH);
+
+//             /* update vF value */
+//             vF = _mm256_subs_epi16 (vF, vGapExtend);
+//             vF = _mm256_max_epi16 (vF, vH);
+
+//             /* save vE values */
+//             _mm256_storeu_si256 (pvE + j, vE);
+
+//             /* load the next h value */
+//             vH = _mm256_loadu_si256 (pvHLoad + j);
+//         }
+
+//         /* reset pointers to the start of the saved data */
+//         j = 0;
+//         vH = _mm256_loadu_si256 (pvHStore + j);
+
+//         /*  the computed vF value is for the given column.  since */
+//         /*  we are at the end, we need to shift the vF value over */
+//         /*  to the next column. */
+//         // vF = _mm_slli_si128 (vF, 2);
+//         vF=_mm256_alignr_epi8(vF, _mm256_permute2x128_si256(vF, vF, _MM_SHUFFLE(0, 0, 2, 0)), 16 - 2);
+//         vF = _mm256_or_si256 (vF, vMin);
+//         vTemp = _mm256_subs_epi16 (vH, vGapOpen);
+//         vTemp = _mm256_cmpgt_epi16 (vF, vTemp);
+//         cmp  = _mm256_movemask_epi8 (vTemp);
+//         while (cmp != 0x00000000) 
+//         {
+//             vE = _mm256_loadu_si256 (pvE + j);
+
+//             vH = _mm256_max_epi16 (vH, vF);
+
+//             /* save vH values */
+//             _mm256_storeu_si256 (pvHStore + j, vH);
+
+//             /*  update vE incase the new vH value would change it */
+//             vH = _mm256_subs_epi16 (vH, vGapOpen);
+//             vE = _mm256_max_epi16 (vE, vH);
+//             _mm256_storeu_si256 (pvE + j, vE);
+
+//             /* update vF value */
+//             vF = _mm256_subs_epi16 (vF, vGapExtend);
+
+//             j++;
+//             if (j >= iter)
+//             {
+//                 j = 0;
+//                 // vF = _mm_slli_si128 (vF, 2);
+//                 vF=_mm256_alignr_epi8(vF, _mm256_permute2x128_si256(vF, vF, _MM_SHUFFLE(0, 0, 2, 0)), 16 - 2);
+//                 vF = _mm256_or_si256 (vF, vMin);
+//             }
+
+//             vH = _mm256_loadu_si256 (pvHStore + j);
+
+//             vTemp = _mm256_subs_epi16 (vH, vGapOpen);
+//             vTemp = _mm256_cmpgt_epi16 (vF, vTemp);
+//             cmp  = _mm256_movemask_epi8 (vTemp);
+//             // 
+//         }
+//         printf("123123\n");
+//     }
+
+//     /* find largest score in the vMaxScore vector */
+//     // vTemp = _mm256_srli_si256 (vMaxScore, 16);
+//     // vMaxScore = _mm256_max_epi16 (vMaxScore, vTemp);
+//     // vTemp = _mm_srli_si128 (vMaxScore, 8);
+//     // vMaxScore = _mm_max_epi16 (vMaxScore, vTemp);
+//     // vTemp = _mm_srli_si128 (vMaxScore, 4);
+//     // vMaxScore = _mm_max_epi16 (vMaxScore, vTemp);
+//     // vTemp = _mm_srli_si128 (vMaxScore, 2);
+//     // vMaxScore = _mm_max_epi16 (vMaxScore, vTemp);
+//     vTemp=_mm256_alignr_epi8(_mm256_permute2x128_si256(vMaxScore, vMaxScore, _MM_SHUFFLE(2, 0, 0, 1)), vMaxScore, 16);
+//     vMaxScore = _mm256_max_epu16 (vMaxScore, vTemp);
+//     // vTemp = _mm256_srli_si256 (vMaxScore, 8);
+//     vTemp=_mm256_alignr_epi8(_mm256_permute2x128_si256(vMaxScore, vMaxScore, _MM_SHUFFLE(2, 0, 0, 1)), vMaxScore, 8);
+//     vMaxScore = _mm256_max_epu16 (vMaxScore, vTemp);
+//     // vTemp = _mm256_srli_si256 (vMaxScore, 4);
+//     vTemp=_mm256_alignr_epi8(_mm256_permute2x128_si256(vMaxScore, vMaxScore, _MM_SHUFFLE(2, 0, 0, 1)), vMaxScore, 4);
+//     vMaxScore = _mm256_max_epu16 (vMaxScore, vTemp);
+//     // vTemp = _mm256_srli_si256 (vMaxScore, 2);
+//     vTemp=_mm256_alignr_epi8(_mm256_permute2x128_si256(vMaxScore, vMaxScore, _MM_SHUFFLE(2, 0, 0, 1)), vMaxScore, 2);
+//     vMaxScore = _mm256_max_epu16 (vMaxScore, vTemp);
+//     // vTemp = _mm256_srli_si256 (vMaxScore, 1);
+//     vTemp=_mm256_alignr_epi8(_mm256_permute2x128_si256(vMaxScore, vMaxScore, _MM_SHUFFLE(2, 0, 0, 1)), vMaxScore, 1);
+//     vMaxScore = _mm256_max_epu16 (vMaxScore, vTemp);
+
+//     /* store in temporary variable */
+//     score = (short) _mm256_extract_epi16 (vMaxScore, 0);
+    
+
+//     /* return largest score */
+//     return score + SHORT_BIAS;
+// }
 
 
 
@@ -458,10 +664,10 @@ swStripedByte(unsigned char   *querySeq,
               int              dbLength,
               unsigned short   gapOpen,
               unsigned short   gapExtend,
-              __m128i         *pvQueryProf,
-              __m128i         *pvHLoad,
-              __m128i         *pvHStore,
-              __m128i         *pvE,
+              __m256i         *pvQueryProf,
+              __m256i         *pvHLoad,
+              __m256i         *pvHStore,
+              __m256i         *pvE,
               unsigned short   bias)
 {
 
@@ -470,52 +676,57 @@ swStripedByte(unsigned char   *querySeq,
 
     int     dup;
     int     cmp;
-    int     iter = (queryLength + 15) / 16;
+    int     iter = (queryLength + 31) / 32;
     
-    __m128i *pv;
+    __m256i *pv;
 
-    __m128i vE, vF, vH;
+    __m256i vE, vF, vH;
 
-    __m128i vMaxScore;
-    __m128i vBias;
-    __m128i vGapOpen;
-    __m128i vGapExtend;
+    __m256i vMaxScore;
+    __m256i vBias;
+    __m256i vGapOpen;
+    __m256i vGapExtend;
 
-    __m128i vTemp;
-    __m128i vZero;
+    __m256i vTemp;
+    __m256i vZero;
 
-    __m128i *pvScore;
+    __m256i *pvScore;
 
     /* remove unreferenced warning */
     querySeq;
 
     /* Load the bias to all elements of a constant */
-    dup    = (bias << 8) | (bias & 0x00ff);
-    vBias = _mm_insert_epi16 (vBias, dup, 0);
-    vBias = _mm_shufflelo_epi16 (vBias, 0);
-    vBias = _mm_shuffle_epi32 (vBias, 0);
+    // dup    = (bias << 8) | (bias & 0x00ff);
+    // vBias = _mm_insert_epi16 (vBias, dup, 0);
+    // vBias = _mm_shufflelo_epi16 (vBias, 0);
+    // vBias = _mm_shuffle_epi32 (vBias, 0);
+    vBias=_mm256_set1_epi8(bias);
 
     /* Load gap opening penalty to all elements of a constant */
-    dup    = (gapOpen << 8) | (gapOpen & 0x00ff);
-    vGapOpen = _mm_insert_epi16 (vGapOpen, dup, 0);
-    vGapOpen = _mm_shufflelo_epi16 (vGapOpen, 0);
-    vGapOpen = _mm_shuffle_epi32 (vGapOpen, 0);
+    // dup    = (gapOpen << 8) | (gapOpen & 0x00ff);
+    // vGapOpen = _mm_insert_epi16 (vGapOpen, dup, 0);
+    // vGapOpen = _mm_shufflelo_epi16 (vGapOpen, 0);
+    // vGapOpen = _mm_shuffle_epi32 (vGapOpen, 0);
+    vGapOpen=_mm256_set1_epi8(gapOpen);
 
     /* Load gap extension penalty to all elements of a constant */
-    dup    = (gapExtend << 8) | (gapExtend & 0x00ff);
-    vGapExtend = _mm_insert_epi16 (vGapExtend, dup, 0);
-    vGapExtend = _mm_shufflelo_epi16 (vGapExtend, 0);
-    vGapExtend = _mm_shuffle_epi32 (vGapExtend, 0);
+    // dup    = (gapExtend << 8) | (gapExtend & 0x00ff);
+    // vGapExtend = _mm_insert_epi16 (vGapExtend, dup, 0);
+    // vGapExtend = _mm_shufflelo_epi16 (vGapExtend, 0);
+    // vGapExtend = _mm_shuffle_epi32 (vGapExtend, 0);
+    vGapExtend=_mm256_set1_epi8(gapExtend);
 
-    vMaxScore = _mm_xor_si128 (vMaxScore, vMaxScore);//置0
+    // vMaxScore = _mm_xor_si128 (vMaxScore, vMaxScore);//置0
+    vMaxScore=_mm256_setzero_si256();
 
-    vZero = _mm_xor_si128 (vZero, vZero);
+    // vZero = _mm_xor_si128 (vZero, vZero);
+    vZero=_mm256_setzero_si256();
 
     /* Zero out the storage vector */
     for (i = 0; i < iter; i++)
     {
-        _mm_store_si128 (pvE + i, vMaxScore);
-        _mm_store_si128 (pvHStore + i, vMaxScore);
+        _mm256_store_si256 (pvE + i, vMaxScore);
+        _mm256_store_si256 (pvHStore + i, vMaxScore);
     }
 
     for (i = 0; i < dbLength; ++i)
@@ -524,12 +735,14 @@ swStripedByte(unsigned char   *querySeq,
         pvScore = pvQueryProf + dbSeq[i] * iter;
 
         /* zero out F. */
-        vF = _mm_xor_si128 (vF, vF);
+        // vF = _mm_xor_si128 (vF, vF);
+        vF=_mm256_setzero_si256();
 
         /* load the next h value */
-        vH = _mm_load_si128 (pvHStore + iter - 1);
-        vH = _mm_slli_si128 (vH, 1);
-
+        vH = _mm256_loadu_si256 (pvHStore + iter - 1);
+        // vH = _mm256_slli_si256 (vH, 1);
+        vH=_mm256_alignr_epi8(vH, _mm256_permute2x128_si256(vH, vH, _MM_SHUFFLE(0, 0, 2, 0)), 16 - 1);
+        
         pv = pvHLoad;
         pvHLoad = pvHStore;
         pvHStore = pv;
@@ -537,96 +750,105 @@ swStripedByte(unsigned char   *querySeq,
         for (j = 0; j < iter; j++)
         {
             /* load values of vF and vH from previous row (one unit up) */
-            vE = _mm_load_si128 (pvE + j);
+            vE = _mm256_loadu_si256 (pvE + j);
 
             /* add score to vH */
-            vH = _mm_adds_epu8 (vH, *(pvScore + j));
-            vH = _mm_subs_epu8 (vH, vBias);
+            vH = _mm256_adds_epu8 (vH, *(pvScore + j));
+            vH = _mm256_subs_epu8 (vH, vBias);
 
             /* Update highest score encountered this far */
-            vMaxScore = _mm_max_epu8 (vMaxScore, vH);
+            vMaxScore = _mm256_max_epu8 (vMaxScore, vH);
 
             /* get max from vH, vE and vF */
-            vH = _mm_max_epu8 (vH, vE);
-            vH = _mm_max_epu8 (vH, vF);
+            vH = _mm256_max_epu8 (vH, vE);
+            vH = _mm256_max_epu8 (vH, vF);
 
             /* save vH values */
-            _mm_store_si128 (pvHStore + j, vH);
+            _mm256_storeu_si256 (pvHStore + j, vH);
 
             /* update vE value */
-            vH = _mm_subs_epu8 (vH, vGapOpen);
-            vE = _mm_subs_epu8 (vE, vGapExtend);
-            vE = _mm_max_epu8 (vE, vH);
+            vH = _mm256_subs_epu8 (vH, vGapOpen);
+            vE = _mm256_subs_epu8 (vE, vGapExtend);
+            vE = _mm256_max_epu8 (vE, vH);
 
             /* update vF value */
-            vF = _mm_subs_epu8 (vF, vGapExtend);
-            vF = _mm_max_epu8 (vF, vH);
+            vF = _mm256_subs_epu8 (vF, vGapExtend);
+            vF = _mm256_max_epu8 (vF, vH);
 
             /* save vE values */
-            _mm_store_si128 (pvE + j, vE);
+            _mm256_storeu_si256 (pvE + j, vE);
 
             /* load the next h value */
-            vH = _mm_load_si128 (pvHLoad + j);
+            vH = _mm256_loadu_si256 (pvHLoad + j);
         }
 
         /* reset pointers to the start of the saved data */
         j = 0;
-        vH = _mm_load_si128 (pvHStore + j);
+        vH = _mm256_loadu_si256 (pvHStore + j);
 
         /*  the computed vF value is for the given column.  since */
         /*  we are at the end, we need to shift the vF value over */
         /*  to the next column. */
-        vF = _mm_slli_si128 (vF, 1);
-        vTemp = _mm_subs_epu8 (vH, vGapOpen);
-        vTemp = _mm_subs_epu8 (vF, vTemp);
-        vTemp = _mm_cmpeq_epi8 (vTemp, vZero);
-        cmp  = _mm_movemask_epi8 (vTemp);
+        // vF = _mm256_slli_si256 (vF, 1);
+        vF=_mm256_alignr_epi8(vF, _mm256_permute2x128_si256(vF, vF, _MM_SHUFFLE(0, 0, 2, 0)), 16 - 1);
+        vTemp = _mm256_subs_epu8 (vH, vGapOpen);
+        vTemp = _mm256_subs_epu8 (vF, vTemp);
+        vTemp = _mm256_cmpeq_epi8 (vTemp, vZero);
+        cmp  = _mm256_movemask_epi8 (vTemp);
 
-        while (cmp != 0xffff) 
+        while (cmp != 0xffffffff) 
         {
-            vE = _mm_load_si128 (pvE + j);
+            vE = _mm256_loadu_si256 (pvE + j);
 
-            vH = _mm_max_epu8 (vH, vF);
+            vH = _mm256_max_epu8 (vH, vF);
 
             /* save vH values */
-            _mm_store_si128 (pvHStore + j, vH);
+            _mm256_storeu_si256 (pvHStore + j, vH);
 
             /*  update vE incase the new vH value would change it */
-            vH = _mm_subs_epu8 (vH, vGapOpen);
-            vE = _mm_max_epu8 (vE, vH);
-            _mm_store_si128 (pvE + j, vE);
+            vH = _mm256_subs_epu8 (vH, vGapOpen);
+            vE = _mm256_max_epu8 (vE, vH);
+            _mm256_storeu_si256 (pvE + j, vE);
 
             /* update vF value */
-            vF = _mm_subs_epu8 (vF, vGapExtend);
+            vF = _mm256_subs_epu8 (vF, vGapExtend);
 
             j++;
             if (j >= iter)
             {
                 j = 0;
-                vF = _mm_slli_si128 (vF, 1);
+                // vF = _mm256_slli_si256 (vF, 1);
+                vF=_mm256_alignr_epi8(vF, _mm256_permute2x128_si256(vF, vF, _MM_SHUFFLE(0, 0, 2, 0)), 16 - 1);
             }
 
-            vH = _mm_load_si128 (pvHStore + j);
+            vH = _mm256_loadu_si256 (pvHStore + j);
 
-            vTemp = _mm_subs_epu8 (vH, vGapOpen);
-            vTemp = _mm_subs_epu8 (vF, vTemp);
-            vTemp = _mm_cmpeq_epi8 (vTemp, vZero);
-            cmp  = _mm_movemask_epi8 (vTemp);
+            vTemp = _mm256_subs_epu8 (vH, vGapOpen);
+            vTemp = _mm256_subs_epu8 (vF, vTemp);
+            vTemp = _mm256_cmpeq_epi8 (vTemp, vZero);
+            cmp  = _mm256_movemask_epi8 (vTemp);
         }
     }
 
     /* find largest score in the vMaxScore vector */
-    vTemp = _mm_srli_si128 (vMaxScore, 8);
-    vMaxScore = _mm_max_epu8 (vMaxScore, vTemp);
-    vTemp = _mm_srli_si128 (vMaxScore, 4);
-    vMaxScore = _mm_max_epu8 (vMaxScore, vTemp);
-    vTemp = _mm_srli_si128 (vMaxScore, 2);
-    vMaxScore = _mm_max_epu8 (vMaxScore, vTemp);
-    vTemp = _mm_srli_si128 (vMaxScore, 1);
-    vMaxScore = _mm_max_epu8 (vMaxScore, vTemp);
+    // vTemp = _mm256_srli_si256 (vMaxScore, 16);
+    vTemp=_mm256_alignr_epi8(_mm256_permute2x128_si256(vMaxScore, vMaxScore, _MM_SHUFFLE(2, 0, 0, 1)), vMaxScore, 16);
+    vMaxScore = _mm256_max_epu8 (vMaxScore, vTemp);
+    // vTemp = _mm256_srli_si256 (vMaxScore, 8);
+    vTemp=_mm256_alignr_epi8(_mm256_permute2x128_si256(vMaxScore, vMaxScore, _MM_SHUFFLE(2, 0, 0, 1)), vMaxScore, 8);
+    vMaxScore = _mm256_max_epu8 (vMaxScore, vTemp);
+    // vTemp = _mm256_srli_si256 (vMaxScore, 4);
+    vTemp=_mm256_alignr_epi8(_mm256_permute2x128_si256(vMaxScore, vMaxScore, _MM_SHUFFLE(2, 0, 0, 1)), vMaxScore, 4);
+    vMaxScore = _mm256_max_epu8 (vMaxScore, vTemp);
+    // vTemp = _mm256_srli_si256 (vMaxScore, 2);
+    vTemp=_mm256_alignr_epi8(_mm256_permute2x128_si256(vMaxScore, vMaxScore, _MM_SHUFFLE(2, 0, 0, 1)), vMaxScore, 2);
+    vMaxScore = _mm256_max_epu8 (vMaxScore, vTemp);
+    // vTemp = _mm256_srli_si256 (vMaxScore, 1);
+    vTemp=_mm256_alignr_epi8(_mm256_permute2x128_si256(vMaxScore, vMaxScore, _MM_SHUFFLE(2, 0, 0, 1)), vMaxScore, 1);
+    vMaxScore = _mm256_max_epu8 (vMaxScore, vTemp);
 
     /* store in temporary variable */
-    score = _mm_extract_epi16 (vMaxScore, 0);
+    score = _mm256_extract_epi16 (vMaxScore, 0);
     score = score & 0x00ff;
 
     /*  check if we might have overflowed */

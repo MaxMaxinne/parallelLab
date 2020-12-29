@@ -19,6 +19,7 @@ typedef void SW_DATA;
 #define ALPHA_SIZE 23
 
 #include "omp.h"
+#include "immintrin.h"
 
 extern const char AMINO_ACIDS[ALPHA_SIZE];
 extern const int AMINO_ACID_VALUE[256];
