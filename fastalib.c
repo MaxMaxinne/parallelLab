@@ -75,7 +75,7 @@ FASTA_LIB **openLib (char *file, int pad)
         buffer_local[i]->residues=0;
         buffer_local[i]->sequences=0;
     }
-
+    buffer_local[thread_num-1]->size=buffer_local[thread_num-1]->belong->size-(thread_num-1)*chunkSize;
     // lib->seqBuffer = (unsigned char *) malloc (MAX_SEQ_LENGTH);
     // if (!lib->seqBuffer) {
     //     fprintf (stderr, "Unable to allocate memory for sequence\n");
@@ -214,7 +214,7 @@ readNextBlock (FASTA_LIB *lib)
             lib->belong->next=new_node;
         }
         ftime(&e1);
-        TPRINT(lib->tid,s1,e1,"asd:");
+        // TPRINT(lib->tid,s1,e1,"asd:");
         if(lib->belong->next)
             printf("%d",lib->belong->next->size);
     }

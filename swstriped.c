@@ -42,7 +42,17 @@ swStripedWord (unsigned char   *querySeq,
                __m128i         *pvH1,
                __m128i         *pvH2,
                __m128i         *pvE);
-
+// int
+// swStripedWord (unsigned char   *querySeq,
+//                int              queryLength,
+//                unsigned char   *dbSeq,
+//                int              dbLength,
+//                unsigned short   gapOpen,
+//                unsigned short   gapExtend,
+//                __m256i         *queryProf,
+//                __m256i         *pvH1,
+//                __m256i         *pvH2,
+//                __m256i         *pvE);
 
 int
 swStripedByte (unsigned char   *querySeq,
@@ -246,6 +256,15 @@ void swStripedScan (unsigned char   *querySeq,
                                    (__m128i*)stripedData->pvH2,
                                    (__m128i*)stripedData->pvE);
         }
+        // if (score >= 255) {
+        //     score = swStripedWord (querySeq, queryLength, 
+        //                            dbSeq, dbLen, 
+        //                            gapInit, gapExt, 
+        //                            stripedData->pvsQueryProf,
+        //                            stripedData->pvH1,
+        //                            stripedData->pvH2,
+        //                            stripedData->pvE);
+        // }
         // score = swStripedWord (querySeq, queryLength, 
         //                            dbSeq, dbLen, 
         //                            gapInit, gapExt, 
@@ -586,7 +605,7 @@ swStripedWord(unsigned char   *querySeq,
 //         vTemp = _mm256_subs_epi16 (vH, vGapOpen);
 //         vTemp = _mm256_cmpgt_epi16 (vF, vTemp);
 //         cmp  = _mm256_movemask_epi8 (vTemp);
-//         while (cmp != 0x00000000) 
+//         while (cmp != 0x0) 
 //         {
 //             vE = _mm256_loadu_si256 (pvE + j);
 
@@ -617,9 +636,9 @@ swStripedWord(unsigned char   *querySeq,
 //             vTemp = _mm256_subs_epi16 (vH, vGapOpen);
 //             vTemp = _mm256_cmpgt_epi16 (vF, vTemp);
 //             cmp  = _mm256_movemask_epi8 (vTemp);
-//             // 
+//             // printf("%d\n",cmp);
 //         }
-//         printf("123123\n");
+//         // printf("123123\n");
 //     }
 
 //     /* find largest score in the vMaxScore vector */
